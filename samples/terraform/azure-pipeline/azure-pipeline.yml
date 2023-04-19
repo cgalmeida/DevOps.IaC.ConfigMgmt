@@ -1,0 +1,120 @@
+name: 1.0
+pool:
+  vmImage: ubuntu-latest
+trigger:
+  - main
+
+variables:
+  - group: Azure-credentials
+
+stages:
+  - stage: validate
+  displayName: Terraform Validate
+  jobs: 
+    - jobs: validate
+    displayName: Terraform Validate
+    steps:
+      - scripts: |
+        terraform init
+        terraform validate
+      displayName: Terraform Validate
+      env:
+        ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+        ARM_TENANT_ID: $(ARM_TENANT_ID)
+        ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+        ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+
+  - stage: plan
+  displayName: Terraform Plan
+  jobs: 
+    - jobs: plan
+    displayName: Terraform Plan
+    steps:
+      - task: DownloadSecureFile@1
+        name: az_pub_key
+        displayName: Download Az public key
+        inputs: 
+          secureFile: azure-k.pub
+      - scripts: |
+          terraform init
+          terraform plan -out=plan
+        displayName: Terraform Plan
+        env:
+          ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+          ARM_TENANT_ID: $(ARM_TENANT_ID)
+          ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+          ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET) 
+          TF_VAR_az_pub_key: $(az_pub_key.secureFilePath)
+      - publish: $(Build.SourceDirectory)/plan 
+        artifact: plan
+        displayName: Publish Plan
+
+  - stage: approve_apply
+  displayName: Approve Apply
+  jobs: 
+    - job: approve_apply
+      pool: server
+      displayName: Approve Apply
+      steps: 
+        - task: ManualValidation@0
+          timeoutInMinutes: 10
+
+  - stage: apply
+  displayName: Terraform Apply
+  jobs: 
+    - jobs: apply
+    displayName: Terraform Apply
+    steps:
+      - task: DownloadSecureFile@1
+        name: az_pub_key
+        displayName: Download Az public key
+        inputs: 
+          secureFile: azure-k.pub
+      - download: current
+        artifact: plan
+        displayName: Download Plan
+      - scripts: |
+          terraform init
+          terraform apply $(Pipeline.Workspace)/plan/plan
+        displayName: Terraform Apply
+        env:
+          ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+          ARM_TENANT_ID: $(ARM_TENANT_ID)
+          ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+          ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET) 
+          TF_VAR_az_pub_key: $(az_pub_key.secureFilePath)
+
+  - stage: approve_destroy
+  displayName: Approve Destroy
+  jobs: 
+    - job: approve_destroy
+      pool: server
+      displayName: Approve Destroy
+      steps: 
+        - task: ManualValidation@0
+          timeoutInMinutes: 10
+
+  - stage: destroy
+  displayName: Terraform Destroy
+  jobs: 
+    - jobs: destroy
+    displayName: Terraform Destroy
+    steps:
+      - task: DownloadSecureFile@1
+        name: az_pub_key
+        displayName: Download Az public key
+        inputs: 
+          secureFile: azure-k.pub
+      - download: current
+        artifact: destroy
+        displayName: Download Plan
+      - scripts: |
+          terraform init
+          terraform destroy -auto-approve
+        displayName: Terraform Destroy
+        env:
+          ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+          ARM_TENANT_ID: $(ARM_TENANT_ID)
+          ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+          ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET) 
+          TF_VAR_az_pub_key: $(az_pub_key.secureFilePath)
