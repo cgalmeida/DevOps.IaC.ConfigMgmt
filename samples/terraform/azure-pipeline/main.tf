@@ -1,6 +1,6 @@
 terraform {
 
-  required_version = ">= 1.0.0"
+  required_version = ">= 1.4.4"
 
   required_providers {
     azurerm = {
@@ -14,7 +14,7 @@ terraform {
     resource_group_name  = "devopsiacrgremote"
     storage_account_name = "iacstorageaccountremote"
     container_name       = "remote-state"
-    key                  = "pipeline-azure-devops/terraform.tfstate"
+    key                  = "pipe-azure-devops/terraform.tfstate"
   }
 }
 
