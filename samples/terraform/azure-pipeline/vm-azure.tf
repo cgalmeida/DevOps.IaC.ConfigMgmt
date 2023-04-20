@@ -42,9 +42,12 @@ resource "azurerm_linux_virtual_machine" "vm" {
   admin_username        = "terraform"
   network_interface_ids = [azurerm_network_interface.network_interface.id]
 
-  admin_ssh_key {
-    username   = "terraform"
-    public_key = file("./azure-k.pub")
+   dynamic "admin_ssh_key" {
+    for_each = var.azure_pub_key != null ? ["fake"] : []
+    content {
+      public_key = file(var.azure_pub_key)
+      username   = "terraform"
+    }
   }
 
   os_disk {
